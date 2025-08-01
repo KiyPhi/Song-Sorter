@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Song Sorter</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React Libraries -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX transpilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // The entire React application code is placed here.
+        // It will be transpiled by Babel in the browser.
+
+        const { useState, useEffect, useMemo, useRef, useLayoutEffect, forwardRef, useCallback } = React;
+
+        // --- HELPER FUNCTIONS & ICONS ---
+
+        const getYouTubeId = (url) => {
+          if (!url) return null;
+          const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+          const match = url.match(regExp);
+          return (match && match[2].length === 11) ? match[2] : null;
+        };
+
+        const MusicIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>;
+        const TrophyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto h-12 w-12 text-yellow-400"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>;
+        const UpArrowIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
+        const DownArrowIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
+
+
+        // --- Glicko-2 Rating System Implementation ---
+        const Glicko2 = {
+          _tau: 0.5,
+          _g(phi) { return 1 / Math.sqrt(1 + 3 * Math.pow(phi, 2) / Math.pow(Math.PI, 2)); },
+          _E(r, r_j, g_phi_j) { return 1 / (1 + Math.exp(-g_phi_j * (r - r_j))); },
+          _f(x, delta, rd, v, a, tau) {
+              const e_x = Math.exp(x);
+              const term1 = e_x * (Math.pow(delta, 2) - Math.pow(rd, 2) - v - e_x) / (2 * Math.pow(Math.pow(rd, 2) + v + e_x, 2));
+              const term2 = (x - a) / Math.pow(tau, 2);
+              return term1 - term2;
+          },
+          update(player, opponent, score) {
+            const r = (player.rating - 1500) / 173.7178; const rd = player.rd / 173.7178;
+            const r_j = (opponent.rating - 1500) / 173.7178; const rd_j = opponent.rd / 173.7178;
+            const g_phi_j = this._g(rd_j); const E = this._E(r, r_j, g_phi_j);
+            const v = 1 / (Math.pow(g_phi_j, 2) * E * (1 - E)); const delta = v * g_phi_j * (score - E);
+            const a = Math.log(Math.pow(player.volatility, 2)); let A = a; let B;
+            if (Math.pow(delta, 2) > Math.pow(rd, 2) + v) { B = Math.log(Math.pow(delta, 2) - Math.pow(rd, 2) - v); } 
+            else { let k = 1; while (this._f(a - k * this._tau, delta, rd, v, a, this._tau) < 0) { k++; } B = a - k * this._tau; }
+            let fA = this._f(A, delta, rd, v, a, this._tau); let fB = this._f(B, delta, rd, v, a, this._tau);
+            while (Math.abs(B - A) > 1e-6) {
+              const C = A + (A - B) * fA / (fB - fA); const fC = this._f(C, delta, rd, v, a, this._tau);
+              if (fC * fB < 0) { A = B; fA = fB; } else { fA /= 2; } B = C; fB = fC;
+            }
+            const new_sigma_prime = Math.exp(A / 2);
+            const rd_star = Math.sqrt(Math.pow(rd, 2) + Math.pow(new_sigma_prime, 2));
+            const new_rd = 1 / Math.sqrt(1 / Math.pow(rd_star, 2) + 1 / v);
+            const new_r = r + new_rd * new_rd * g_phi_j * (score - E);
+            return { rating: 1500 + 173.7178 * new_r, rd: 173.7178 * new_rd, volatility: new_sigma_prime };
+          }
+        };
+
+        // --- CHILD COMPONENTS ---
+
+        const ScrollButtons = () => {
+          const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+          const scrollToBottom = () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+
+          return (
+            <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-2">
+              <button onClick={scrollToTop} className="bg-white/80 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-gray-200 transition-colors">
+                <UpArrowIcon />
+              </button>
+              <button onClick={scrollToBottom} className="bg-white/80 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-gray-200 transition-colors">
+                <DownArrowIcon />
+              </button>
+            </div>
+          );
+        };
+
+        const SongCard = forwardRef(({ song, onWin, playersRef, isYtApiReady, handlePlayerStateChange, onPlayerReady }, ref) => {
+            const videoId = getYouTubeId(song.youtubeUrl);
+            const playerContainerId = `player-${song.id}`;
+
+            useEffect(() => {
+                if (!isYtApiReady || !song) return;
+                
+                let player;
+                const createPlayer = () => {
+                    player = new window.YT.Player(playerContainerId, {
+                        height: '100%', width: '100%', videoId: videoId,
+                        playerVars: { 'playsinline': 1, 'controls': 1 },
+                        events: {
+                          'onReady': () => { 
+                            playersRef.current[song.id] = player; 
+                            if(onPlayerReady) onPlayerReady();
+                          },
+                          'onStateChange': (e) => handlePlayerStateChange(e, song.id)
+                        }
+                    });
+                }
+                
+                if (window.YT && window.YT.Player) { createPlayer(); }
+
+                return () => {
+                    if (player && typeof player.destroy === 'function') { player.destroy(); }
+                    delete playersRef.current[song.id];
+                };
+            }, [song.id, videoId, isYtApiReady, playersRef, handlePlayerStateChange, onPlayerReady]);
+
+            return (
+                <div ref={ref} className="w-full md:w-5/12 flex flex-col">
+                  <div className="bg-white rounded-xl shadow-lg p-4 flex-grow flex flex-col space-y-4">
+                    <div className="aspect-video w-full bg-black rounded-md"><div id={playerContainerId}></div></div>
+                    <div className="text-center flex-grow">
+                        <h3 className="text-xl font-bold">{song.title}</h3>
+                        {song.artist && <p className="text-md text-gray-500 mt-1">{song.artist}</p>}
+                    </div>
+                    <button onClick={onWin} className="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 z-20 relative">Choose This Song</button>
+                  </div>
+                </div>
+            );
+        });
+
+        const EditSongModal = ({ song, onSave, onCancel }) => {
+            const [title, setTitle] = useState(song.title);
+            const [artist, setArtist] = useState(song.artist);
+            const [youtubeUrl, setYoutubeUrl] = useState(song.youtubeUrl);
+            const videoId = useMemo(() => getYouTubeId(youtubeUrl), [youtubeUrl]);
+
+            const handleSave = () => {
+                onSave({ ...song, title, artist, youtubeUrl });
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 w-full max-w-lg">
+                        <h2 className="text-2xl font-bold mb-4">Edit Song</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label htmlFor="edit-title" className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                <input id="edit-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-4 py-3 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                            <div>
+                                <label htmlFor="edit-artist" className="block text-sm font-medium text-gray-700 mb-1">Artist</label>
+                                <input id="edit-artist" type="text" value={artist} onChange={(e) => setArtist(e.target.value)} className="w-full px-4 py-3 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                            <div>
+                                <label htmlFor="edit-url" className="block text-sm font-medium text-gray-700 mb-1">YouTube URL</label>
+                                <input id="edit-url" type="text" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} className="w-full px-4 py-3 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                            {videoId && (
+                                <div className="aspect-video w-full mt-4">
+                                    <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${videoId}`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="rounded-lg"></iframe>
+                                </div>
+                            )}
+                        </div>
+                        <div className="mt-6 flex justify-end gap-4">
+                            <button onClick={onCancel} className="text-sm bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Cancel</button>
+                            <button onClick={handleSave} className="text-sm bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        const ConfirmResetModal = ({ onConfirm, onCancel }) => {
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 w-full max-w-lg">
+                        <h2 className="text-2xl font-bold mb-2">Keep Progress?</h2>
+                        <p className="text-gray-600 mb-6">You've changed the URL. Would you like to keep the progress for this song?</p>
+                        <div className="flex justify-end gap-4">
+                            <button onClick={() => onConfirm(true)} className="text-sm bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700">Yes, Keep Progress</button>
+                            <button onClick={() => onConfirm(false)} className="text-sm bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600">No, Reset Progress</button>
+                            <button onClick={onCancel} className="text-sm bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Cancel Edit</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const AddSongsView = ({ songs, newSongUrl, setNewSongUrl, newSongTitle, setNewSongTitle, newSongArtist, setNewSongArtist, handleAddSong, videoId, removeSong, startSorting, exportShareableList, importList, importProgress, onEditSong }) => {
+          const listFileInputRef = useRef(null);
+          const progressFileInputRef = useRef(null);
+
+          return (
+            <div className="w-full max-w-2xl mx-auto p-4">
+              {songs.length > 4 && <ScrollButtons />}
+              <div className="bg-white rounded-xl shadow-lg p-6 md:p-8">
+                <div className="text-center mb-6"><h1 className="text-3xl font-bold">Song Sorter</h1><p className="text-gray-500 mt-2">Add songs. This app uses a Glicko-2 rating system to rank them.</p></div>
+                <form onSubmit={handleAddSong} className="space-y-4">
+                  <div><label htmlFor="youtubeUrl" className="block text-sm font-medium text-gray-700 mb-1">YouTube URL</label><input id="youtubeUrl" type="text" value={newSongUrl} onChange={(e) => setNewSongUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="w-full px-4 py-3 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"/></div>
+                  {videoId && (<div className="space-y-4 pt-4 border-t"><div className="aspect-video"><iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${videoId}`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="rounded-lg"></iframe></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input type="text" value={newSongTitle} onChange={(e) => setNewSongTitle(e.target.value)} placeholder="Song Title" required className="w-full px-4 py-3 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"/><input type="text" value={newSongArtist} onChange={(e) => setNewSongArtist(e.target.value)} placeholder="Artist (Optional)" className="w-full px-4 py-3 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"/></div><button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 flex items-center justify-center"><MusicIcon /> Add Song to List</button></div>)}
+                </form>
+              </div>
+              <div className="mt-8">
+                <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-semibold">{songs.length} Song{songs.length !== 1 && 's'} Added</h2><div className="flex flex-wrap gap-2"><input type="file" ref={listFileInputRef} onChange={importList} accept=".txt" className="hidden" /><input type="file" ref={progressFileInputRef} onChange={importProgress} accept=".json" className="hidden" /><button onClick={() => listFileInputRef.current.click()} className="text-sm bg-gray-200 text-gray-700 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300">Import List (.txt)</button><button onClick={() => progressFileInputRef.current.click()} className="text-sm bg-gray-200 text-gray-700 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300">Import Progress (.json)</button><button onClick={exportShareableList} disabled={songs.length === 0} className="text-sm bg-gray-200 text-gray-700 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300 disabled:opacity-50">Export List (.txt)</button></div></div>
+                {songs.length > 0 && (<div className="bg-white rounded-xl shadow-lg p-4 space-y-3">{songs.map((song) => (<div key={song.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg gap-2"><div><p className="font-semibold">{song.title}</p>{song.artist && <p className="text-sm text-gray-500">{song.artist}</p>}</div><div className="flex items-center gap-2"><button onClick={() => onEditSong(song)} className="text-blue-500 hover:text-blue-700 font-semibold text-sm">Edit</button><button onClick={() => removeSong(song.id)} className="text-red-500 hover:text-red-700 font-semibold text-sm">Remove</button></div></div>))}</div>)}
+              </div>
+              {songs.length >= 2 && <div className="mt-8"><button onClick={startSorting} className="w-full bg-indigo-600 text-white font-bold py-4 px-4 rounded-lg text-lg shadow-md hover:bg-indigo-700">Start Sorting</button></div>}
+            </div>
+          );
+        };
+
+        const SortingView = ({ comparisonPair, handleComparisonResult, playersRef, isYtApiReady, handlePlayerStateChange, handleUndo, exportProgress, setGameState, confidence, history }) => {
+            const [songA, songB] = comparisonPair;
+            const cardARef = useRef(null);
+            const cardBRef = useRef(null);
+            const tieButtonRef = useRef(null);
+            const hoverRegions = useRef(null);
+            const [activePlayerId, setActivePlayerId] = useState(null);
+            const pauseTimeoutRef = useRef(null);
+
+            const calculateAreas = useCallback(() => {
+                if (cardARef.current && cardBRef.current && tieButtonRef.current) {
+                    const cardRectA = cardARef.current.getBoundingClientRect();
+                    const cardRectB = cardBRef.current.getBoundingClientRect();
+                    const tieRect = tieButtonRef.current.getBoundingClientRect();
+                    
+                    hoverRegions.current = {
+                        left: {
+                            x1: 0,
+                            x2: tieRect.left,
+                            y1: cardRectA.bottom - (cardRectA.height * 2),
+                            y2: cardRectA.bottom + (cardRectA.height * 0.2),
+                        },
+                        right: {
+                            x1: tieRect.right,
+                            x2: window.innerWidth,
+                            y1: cardRectB.bottom - (cardRectB.height * 2),
+                            y2: cardRectB.bottom + (cardRectB.height * 0.2),
+                        }
+                    };
+                }
+            }, []);
+
+            useEffect(() => {
+                const timer = setTimeout(calculateAreas, 100);
+                window.addEventListener('resize', calculateAreas);
+
+                const handleMouseMove = (e) => {
+                    if (!hoverRegions.current) return;
+                    const { clientX: x, clientY: y } = e;
+                    const { left, right } = hoverRegions.current;
+                    let newActivePlayerId = null;
+                    if (x >= left.x1 && x <= left.x2 && y >= left.y1 && y <= left.y2) {
+                        newActivePlayerId = songA.id;
+                    } else if (x >= right.x1 && x <= right.x2 && y >= right.y1 && y <= right.y2) {
+                        newActivePlayerId = songB.id;
+                    }
+                    setActivePlayerId(newActivePlayerId);
+                };
+
+                window.addEventListener('mousemove', handleMouseMove);
+
+                return () => {
+                    clearTimeout(timer);
+                    window.removeEventListener('resize', calculateAreas);
+                    window.removeEventListener('mousemove', handleMouseMove);
+                }
+            }, [comparisonPair, calculateAreas, songA, songB]);
+
+            useEffect(() => {
+                clearTimeout(pauseTimeoutRef.current);
+                if (activePlayerId) {
+                    const playerToPlay = playersRef.current[activePlayerId];
+                    const otherPlayerId = activePlayerId === songA.id ? songB.id : songA.id;
+                    const playerToPause = playersRef.current[otherPlayerId];
+                    if (playerToPlay?.playVideo) playerToPlay.playVideo();
+                    if (playerToPause?.pauseVideo) playerToPause.pauseVideo();
+                } else {
+                    pauseTimeoutRef.current = setTimeout(() => {
+                        Object.values(playersRef.current).forEach(player => player?.pauseVideo?.());
+                    }, 50);
+                }
+            }, [activePlayerId, playersRef, songA, songB]);
+
+            if (!songA || !songB) return <div className="text-center"><h2 className="text-2xl font-bold">Loading...</h2></div>;
+            
+            return (
+              <div className="w-full max-w-5xl mx-auto p-4 flex flex-col h-full justify-center">
+                  <div className="text-center mb-8"><h1 className="text-3xl font-bold">Which song is better?</h1></div>
+                  <div className="flex flex-col md:flex-row items-stretch justify-around space-y-6 md:space-y-0 md:space-x-6">
+                    <SongCard 
+                      ref={cardARef} 
+                      song={songA} 
+                      onWin={() => handleComparisonResult(songA, songB)} 
+                      onPlayerReady={calculateAreas}
+                      {...{playersRef, isYtApiReady, handlePlayerStateChange}} 
+                    />
+                    <div className="text-2xl font-bold text-gray-700 flex flex-col items-center justify-center px-4">
+                      <span>OR</span>
+                      <button ref={tieButtonRef} onClick={() => handleComparisonResult(songA, songB, true)} className="mt-4 text-base bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Tie</button>
+                    </div>
+                    <SongCard 
+                      ref={cardBRef} 
+                      song={songB} 
+                      onWin={() => handleComparisonResult(songB, songA)} 
+                      onPlayerReady={calculateAreas}
+                      {...{playersRef, isYtApiReady, handlePlayerStateChange}}
+                    />
+                  </div>
+                  <div className="mt-12 w-full max-w-md mx-auto text-center">
+                    <div className="flex justify-between mb-1"><span className="text-base font-medium">List Confidence</span><span className="text-sm font-medium">{confidence}%</span></div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5"><div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${confidence}%` }}></div></div>
+                    <div className="mt-4 flex justify-center gap-4">
+                      <button onClick={handleUndo} disabled={history.length === 0} className="text-sm bg-red-100 text-red-700 font-semibold py-2 px-4 rounded-lg hover:bg-red-200 disabled:opacity-50">Undo</button>
+                      <button onClick={exportProgress} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">Export Progress</button>
+                      <button onClick={() => setGameState('rankings')} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">View Rankings</button>
+                    </div>
+                  </div>
+              </div>
+            );
+        };
+
+        const RankingsView = ({ rankedSongs, setGameState, selectNextPair, songs, exportNumberedList, handleReset, exportProgress }) => (
+            <div className="w-full max-w-2xl mx-auto p-4">
+              {rankedSongs.length > 4 && <ScrollButtons />}
+              <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 text-center"><TrophyIcon /><h1 className="text-4xl font-bold mt-4">Current Rankings</h1><p className="text-gray-500 mt-2">The more you sort, the more accurate this list becomes.</p></div>
+              <div className="mt-8 bg-white rounded-xl shadow-lg p-4">
+                <ol className="space-y-3">{rankedSongs.map((song, index) => {
+                  const isTopRanked = (rankedSongs.length >= 30 && index < 10) || index < 3;
+                  return (
+                    <li key={song.id} className="flex items-center bg-gray-50 p-4 rounded-lg">
+                      <span className={`text-xl font-bold ${isTopRanked ? 'text-indigo-600' : 'text-gray-400'} w-10`}>{index + 1}</span>
+                      <div className="flex-grow"><p className="font-semibold">{song.title}</p>{song.artist && <p className="text-sm text-gray-500">{song.artist}</p>}</div>
+                      <div className="text-right"><p className="font-semibold">{Math.round(song.rating)}</p><p className="text-xs text-gray-500">±{Math.round(song.rd * 2)}</p></div>
+                    </li>
+                  );
+                })}</ol>
+              </div>
+              <div className="mt-8 grid grid-cols-2 gap-4">
+                <button onClick={() => { setGameState('sorting'); selectNextPair(songs); }} className="bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700">Continue Sorting</button>
+                <button onClick={exportProgress} className="bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700">Export Progress (.json)</button>
+                <button onClick={() => setGameState('adding')} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">Add/Remove Songs</button>
+                <button onClick={handleReset} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">Start Over</button>
+              </div>
+            </div>
+        );
+
+
+        // --- MAIN APP COMPONENT ---
+        function App() {
+          const [songs, setSongs] = useState([]);
+          const [newSongUrl, setNewSongUrl] = useState('');
+          const [newSongTitle, setNewSongTitle] = useState('');
+          const [newSongArtist, setNewSongArtist] = useState('');
+          const [gameState, setGameState] = useState('adding');
+          const [comparisonPair, setComparisonPair] = useState([null, null]);
+          const [history, setHistory] = useState([]);
+          const playersRef = useRef({});
+          const [isYtApiReady, setIsYtApiReady] = useState(false);
+          const [editingSong, setEditingSong] = useState(null);
+          const [urlChangeConfirm, setUrlChangeConfirm] = useState(null);
+
+          useEffect(() => {
+            if (window.YT && window.YT.Player) { setIsYtApiReady(true); return; }
+            const tag = document.createElement('script');
+            tag.src = "https://www.youtube.com/iframe_api";
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            if (firstScriptTag && firstScriptTag.parentNode) { firstScriptTag.parentNode.insertBefore(tag, firstScriptTag); } 
+            else { document.head.appendChild(tag); }
+            window.onYouTubeIframeAPIReady = () => { setIsYtApiReady(true); };
+          }, []);
+
+          const videoId = useMemo(() => getYouTubeId(newSongUrl), [newSongUrl]);
+          const rankedSongs = useMemo(() => [...songs].sort((a, b) => b.rating - a.rating), [songs]);
+          
+          const confidence = useMemo(() => {
+            if (songs.length < 2) return 0;
+            const totalRD = songs.reduce((sum, song) => sum + song.rd, 0); const avgRD = totalRD / songs.length;
+            const maxRD = 350; const minRD = 50;
+            const confidenceValue = 100 * (1 - (Math.max(0, avgRD - minRD)) / (maxRD - minRD));
+            return Math.max(0, Math.min(100, Math.round(confidenceValue)));
+          }, [songs]);
+
+          const handleAddSong = (e) => {
+            e.preventDefault();
+            if (newSongTitle.trim() && videoId) {
+              setSongs([...songs, { id: crypto.randomUUID(), title: newSongTitle.trim(), artist: newSongArtist.trim(), youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`, rating: 1500, rd: 350, volatility: 0.06, comparisons: 0 }]);
+              setNewSongUrl(''); setNewSongTitle(''); setNewSongArtist('');
+            }
+          };
+          
+          const removeSong = (id) => setSongs(songs.filter(song => song.id !== id));
+          
+          const selectNextPair = (currentSongs) => {
+            if (currentSongs.length < 2) { setGameState('adding'); return; }
+            if (Math.random() < 0.2) {
+              let i1 = Math.floor(Math.random() * currentSongs.length); let i2 = Math.floor(Math.random() * currentSongs.length);
+              while (i1 === i2) { i2 = Math.floor(Math.random() * currentSongs.length); }
+              setComparisonPair([currentSongs[i1], currentSongs[i2]]); return;
+            }
+            let bestPair = [null, null]; let maxUncertainty = -1;
+            const ranks = [...currentSongs].sort((a, b) => b.rating - a.rating);
+            for (let i = 0; i < ranks.length - 1; i++) {
+              const s1 = ranks[i]; const s2 = ranks[i+1];
+              const uncertainty = s1.rd + s2.rd;
+              if (uncertainty > maxUncertainty) { maxUncertainty = uncertainty; bestPair = [s1, s2]; }
+            }
+            setComparisonPair(bestPair);
+          };
+
+          const startSorting = () => {
+            if (songs.length < 2) return;
+            const initSongs = songs.map(s => ({ ...s, rating: s.rating || 1500, rd: s.rd || 350, volatility: s.volatility || 0.06, comparisons: s.comparisons || 0 }));
+            setSongs(initSongs); setHistory([]); setGameState('sorting'); selectNextPair(initSongs);
+          };
+
+          const handleComparisonResult = (winner, loser, isTie = false) => {
+            const updatedHistory = [...history, songs].slice(-100); // Keep the last 100 items
+            setHistory(updatedHistory); 
+            const score_winner = isTie ? 0.5 : 1.0; const score_loser = isTie ? 0.5 : 0.0;
+            const newWinnerData = Glicko2.update(winner, loser, score_winner);
+            const newLoserData = Glicko2.update(loser, winner, score_loser);
+            const updatedSongs = songs.map(song => {
+              if (song.id === winner.id) return { ...song, ...newWinnerData, comparisons: song.comparisons + 1 };
+              if (song.id === loser.id) return { ...song, ...newLoserData, comparisons: song.comparisons + 1 };
+              return song;
+            });
+            setSongs(updatedSongs); selectNextPair(updatedSongs);
+          };
+          
+          const handleUndo = () => {
+            if (history.length === 0) return;
+            const newHistory = [...history];
+            const lastState = newHistory.pop();
+            setSongs(lastState); 
+            setHistory(newHistory); 
+            selectNextPair(lastState);
+          };
+
+          const handlePlayerStateChange = useCallback((event, activePlayerId) => {
+            if (event.data === 1) { // 1 is YT.PlayerState.PLAYING
+                Object.keys(playersRef.current).forEach(playerId => {
+                    if (playerId !== activePlayerId && playersRef.current[playerId] && typeof playersRef.current[playerId].pauseVideo === 'function') {
+                        playersRef.current[playerId].pauseVideo();
+                    }
+                });
+            }
+          }, []);
+
+          const handleSaveEdit = (updatedSong) => {
+            const originalSong = songs.find(s => s.id === updatedSong.id);
+            if (originalSong.youtubeUrl !== updatedSong.youtubeUrl) {
+                setUrlChangeConfirm(updatedSong);
+                setEditingSong(null);
+            } else {
+                const newSongs = songs.map(song => song.id === updatedSong.id ? updatedSong : song);
+                setSongs(newSongs);
+                setEditingSong(null);
+            }
+          };
+
+          const handleUrlChangeConfirm = (keepProgress) => {
+            const updatedSong = urlChangeConfirm;
+            const newSongs = songs.map(song => {
+                if (song.id === updatedSong.id) {
+                    if (keepProgress) {
+                        return updatedSong;
+                    } else {
+                        return { 
+                            ...updatedSong, 
+                            rating: 1500, 
+                            rd: 350, 
+                            volatility: 0.06, 
+                            comparisons: 0 
+                        };
+                    }
+                }
+                return song;
+            });
+            setSongs(newSongs);
+            setUrlChangeConfirm(null);
+          };
+
+          const exportProgress = () => { const blob = new Blob([JSON.stringify({songs, history}, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'song-sorter-elo-progress.json'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); };
+          const importProgress = (event) => { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const { songs: importedSongs, history: importedHistory } = JSON.parse(e.target.result); if (importedSongs) { setSongs(importedSongs); setHistory(importedHistory || []); setGameState('rankings'); } else { alert("Invalid progress file."); } } catch (error) { alert("Could not import progress file."); } }; reader.readAsText(file); event.target.value = null; };
+          const importList = (event) => { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { const content = e.target.result; const lines = content.split('\n').filter(line => line.trim() !== ''); const importedSongs = lines.map(line => { const parts = line.split('|'); if (parts.length < 3) return null; const title = parts[0].trim(); const artist = parts[1].trim(); const url = parts[2].trim(); if (!title || !url) return null; return { id: crypto.randomUUID(), title, artist, youtubeUrl: url, rating: 1500, rd: 350, volatility: 0.06, comparisons: 0 }; }).filter(Boolean); if (importedSongs.length > 0) { setSongs(importedSongs); setHistory([]); setGameState('adding'); } }; reader.readAsText(file); event.target.value = null; };
+          
+          const exportShareableList = () => {
+            const list = songs.map(s => `${s.title}|${s.artist || ''}|${s.youtubeUrl}`).join('\n');
+            const blob = new Blob([list], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'song-list.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          };
+
+          const handleReset = () => { setSongs([]); setHistory([]); setGameState('adding'); };
+          
+          return (
+            <div className="bg-gray-50 min-h-screen w-full flex items-center justify-center p-4 font-sans">
+              {editingSong && <EditSongModal song={editingSong} onSave={handleSaveEdit} onCancel={() => setEditingSong(null)} />}
+              {urlChangeConfirm && <ConfirmResetModal onConfirm={handleUrlChangeConfirm} onCancel={() => setUrlChangeConfirm(null)} />}
+              {gameState === 'adding' && (
+                <AddSongsView 
+                  {...{ songs, newSongUrl, setNewSongUrl, newSongTitle, setNewSongTitle, newSongArtist, setNewSongArtist, handleAddSong, videoId, removeSong, startSorting, exportShareableList, importList, importProgress }}
+                  onEditSong={setEditingSong}
+                />
+              )}
+              {gameState === 'sorting' && (
+                <SortingView 
+                  {...{ comparisonPair, handleComparisonResult, playersRef, isYtApiReady, handlePlayerStateChange, handleUndo, exportProgress, setGameState, confidence, history }}
+                />
+              )}
+              {gameState === 'rankings' && (
+                <RankingsView 
+                  {...{ rankedSongs, setGameState, selectNextPair, songs, exportNumberedList: exportProgress, handleReset, exportProgress }}
+                />
+              )}
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+    </script>
+</body>
+</html>
