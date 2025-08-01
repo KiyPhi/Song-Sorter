@@ -46,7 +46,7 @@ A: Yes. From the "Current Rankings" page, you can click the "Add/Remove Songs" b
 
 **Q: How does the "Edit" feature work?**
 
-A: The "Edit" button lets you change the title, artist, or URL of a song. If you only edit the title or artist, your sorting progress for that song is kept. If you change the URL, the app will ask if you want to keep the song's progress (useful for re-uploads or quality upgrades) or reset it.
+A: The "Edit" button lets you change the title, artist, or URL of a song. If you only edit the title or artist, your sorting progress for that song is kept. If you change the URL, the app will ask if you want to keep the song's progress (useful for re-uploads, region blocked videos, or quality upgrades) or reset it.
 
 **Q: What's the best way to share my final ranked list with friends?**
 
