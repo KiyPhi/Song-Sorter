@@ -344,6 +344,9 @@
                 <button onClick={() => setGameState('adding')} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">Add/Remove Songs</button>
                 <button onClick={handleReset} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">Start Over</button>
               </div>
+              <div className="mt-4 text-center">
+                <button onClick={exportNumberedList} className="text-indigo-600 hover:underline text-sm font-semibold">Export Numbered List (.txt)</button>
+              </div>
             </div>
         );
 
@@ -500,6 +503,19 @@
             URL.revokeObjectURL(url);
           };
 
+          const exportNumberedList = () => { 
+            const list = rankedSongs.map((s, i) => `${i + 1}. ${s.title}${s.artist ? ` - ${s.artist}` : ''} (Rating: ${Math.round(s.rating)})`).join('\n'); 
+            const blob = new Blob([list], { type: 'text/plain;charset=utf-8' }); 
+            const url = URL.createObjectURL(blob); 
+            const a = document.createElement('a'); 
+            a.href = url; 
+            a.download = 'ranked-song-list.txt'; 
+            document.body.appendChild(a); 
+            a.click(); 
+            document.body.removeChild(a); 
+            URL.revokeObjectURL(url); 
+          };
+
           const handleReset = () => { setSongs([]); setHistory([]); setGameState('adding'); };
           
           return (
@@ -519,7 +535,7 @@
               )}
               {gameState === 'rankings' && (
                 <RankingsView 
-                  {...{ rankedSongs, setGameState, selectNextPair, songs, exportNumberedList: exportProgress, handleReset, exportProgress }}
+                  {...{ rankedSongs, setGameState, selectNextPair, songs, exportNumberedList, handleReset, exportProgress }}
                 />
               )}
             </div>
