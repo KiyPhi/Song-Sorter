@@ -56,7 +56,7 @@ A: The best way to share your visual, numbered list is to simply take a screensh
 
 **Q: On the final rankings page, what does the "±" number next to the rating mean?**
 
-A: That is the "Rating Deviation" (RD). It's a measure of how certain the system is about that specific song's rating. A smaller number means the system is very confident in that song's position, while a larger number means its position is still likely to change with more comparisons.
+A: That is the "Rating Deviation" (RD). It's a measure of how certain the system is about that specific song's rating. A smaller number means the system is very confident in that song's position, while a larger number means its position is still likely to change with more comparisons. I wouldn't worry about it too much though, just as long as your final list looks okay to you.
 
 **Q: Why do some YouTube videos not show a preview?**
 
