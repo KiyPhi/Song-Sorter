@@ -50,7 +50,7 @@ A: The "Edit" button lets you change the title, artist, or URL of a song. If you
 
 **Q: What's the best way to share my final ranked list with friends?**
 
-A: The best way to share your visual, numbered list is to simply take a screenshot of the "Current Rankings" page. If you want a friend to be able to sort the same list you did, go to the "Add Songs" page and use the "Export List (.txt)" button to give them a clean list they can import.
+A: The best way to share your visual, numbered list is to simply take a screenshot of the "Current Rankings" page or click the "Export Numbered List" button at the bottom of the rankings for longer lists. If you want a friend to be able to sort the same list you did, go to the "Add Songs" page and use the "Export List (.txt)" button to give them a clean list they can import.
 
 ### Technical Questions
 
