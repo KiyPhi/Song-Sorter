@@ -91,7 +91,7 @@
             const playerContainerId = `player-${song.id}`;
 
             useEffect(() => {
-                if (!isYtApiReady || !song) return;
+                if (!isYtApiReady || !song || !videoId) return; // Failsafe for invalid video ID
                 
                 let player;
                 const createPlayer = () => {
@@ -119,7 +119,15 @@
             return (
                 <div ref={ref} className="w-full md:w-5/12 flex flex-col">
                   <div className="bg-white rounded-xl shadow-lg p-4 flex-grow flex flex-col space-y-4">
-                    <div className="aspect-video w-full bg-black rounded-md"><div id={playerContainerId}></div></div>
+                    <div className="aspect-video w-full bg-black rounded-md">
+                        {videoId ? (
+                            <div id={playerContainerId}></div>
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-white text-center p-4">
+                                <p>Invalid YouTube URL. Video cannot be played.</p>
+                            </div>
+                        )}
+                    </div>
                     <div className="text-center flex-grow">
                         <h3 className="text-xl font-bold">{song.title}</h3>
                         {song.artist && <p className="text-md text-gray-500 mt-1">{song.artist}</p>}
@@ -397,20 +405,48 @@
           const removeSong = (id) => setSongs(songs.filter(song => song.id !== id));
           
           const selectNextPair = (currentSongs) => {
-            if (currentSongs.length < 2) { setGameState('adding'); return; }
+            if (currentSongs.length < 2) { 
+                setGameState('adding'); 
+                return; 
+            }
+
+            const selectRandomPair = () => {
+                let i1 = Math.floor(Math.random() * currentSongs.length);
+                let i2 = Math.floor(Math.random() * currentSongs.length);
+                while (i1 === i2) {
+                    i2 = Math.floor(Math.random() * currentSongs.length);
+                }
+                setComparisonPair([currentSongs[i1], currentSongs[i2]]);
+            };
+
             if (Math.random() < 0.2) {
-              let i1 = Math.floor(Math.random() * currentSongs.length); let i2 = Math.floor(Math.random() * currentSongs.length);
-              while (i1 === i2) { i2 = Math.floor(Math.random() * currentSongs.length); }
-              setComparisonPair([currentSongs[i1], currentSongs[i2]]); return;
+                selectRandomPair();
+                return;
             }
-            let bestPair = [null, null]; let maxUncertainty = -1;
-            const ranks = [...currentSongs].sort((a, b) => b.rating - a.rating);
-            for (let i = 0; i < ranks.length - 1; i++) {
-              const s1 = ranks[i]; const s2 = ranks[i+1];
-              const uncertainty = s1.rd + s2.rd;
-              if (uncertainty > maxUncertainty) { maxUncertainty = uncertainty; bestPair = [s1, s2]; }
+
+            try {
+                let bestPair = [null, null]; 
+                let maxUncertainty = -1;
+                const ranks = [...currentSongs].sort((a, b) => b.rating - a.rating);
+                for (let i = 0; i < ranks.length - 1; i++) {
+                  const s1 = ranks[i]; 
+                  const s2 = ranks[i+1];
+                  const uncertainty = s1.rd + s2.rd;
+                  if (uncertainty > maxUncertainty) { 
+                    maxUncertainty = uncertainty; 
+                    bestPair = [s1, s2]; 
+                  }
+                }
+                if (bestPair[0] && bestPair[1]) {
+                    setComparisonPair(bestPair);
+                } else {
+                    // This should not happen if there are at least 2 songs, but as a failsafe:
+                    selectRandomPair();
+                }
+            } catch (error) {
+                console.error("Error selecting the most volatile pair, using random pair as a failsafe:", error);
+                selectRandomPair();
             }
-            setComparisonPair(bestPair);
           };
 
           const startSorting = () => {
