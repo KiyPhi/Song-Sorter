@@ -64,7 +64,7 @@ A: YouTube sometimes restricts certain videos from being embedded on third-party
 
 **Q: What happens if I close the browser? Is my progress saved automatically?**
 
-A: No, progress is **not** saved automatically. You must remember to click "Export Progress" to save your session before closing the browser tab.
+A: No, progress is **not** saved automatically. You must remember to click "Export Progress" to save your session before closing or refreshing the tab. If you try to close or refresh the tab after making a choice, your browser will show a warning; this is your reminder that you have unsaved progress that needs to be exported.
 
 **Q: I'm sorting a huge list. Why is the "Export Progress" file so big?**
 
