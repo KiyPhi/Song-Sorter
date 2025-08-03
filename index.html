@@ -30,10 +30,10 @@
           return (match && match[2].length === 11) ? match[2] : null;
         };
 
-        const MusicIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>;
         const TrophyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto h-12 w-12 text-yellow-400"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>;
         const UpArrowIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
         const DownArrowIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
+        const FetchTitleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
 
 
         // --- Glicko-2 Rating System Implementation ---
@@ -201,7 +201,7 @@
             );
         };
 
-        const AddSongsView = ({ songs, newSongUrl, setNewSongUrl, newSongTitle, setNewSongTitle, newSongArtist, setNewSongArtist, handleAddSong, videoId, removeSong, startSorting, exportShareableList, importList, importProgress, onEditSong }) => {
+        const AddSongsView = ({ songs, newSongUrl, setNewSongUrl, newSongTitle, setNewSongTitle, newSongArtist, setNewSongArtist, handleAddSong, videoId, removeSong, startSorting, exportShareableList, importList, importProgress, onEditSong, handleFetchTitle }) => {
           const listFileInputRef = useRef(null);
           const progressFileInputRef = useRef(null);
 
@@ -212,7 +212,15 @@
                 <div className="text-center mb-6"><h1 className="text-3xl font-bold">Song Sorter</h1><p className="text-gray-500 mt-2">Add songs. This app uses a Glicko-2 rating system to rank them.</p></div>
                 <form onSubmit={handleAddSong} className="space-y-4">
                   <div><label htmlFor="youtubeUrl" className="block text-sm font-medium text-gray-700 mb-1">YouTube URL</label><input id="youtubeUrl" type="text" value={newSongUrl} onChange={(e) => setNewSongUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="w-full px-4 py-3 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"/></div>
-                  {videoId && (<div className="space-y-4 pt-4 border-t"><div className="aspect-video"><iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${videoId}`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="rounded-lg"></iframe></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input type="text" value={newSongTitle} onChange={(e) => setNewSongTitle(e.target.value)} placeholder="Song Title" required className="w-full px-4 py-3 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"/><input type="text" value={newSongArtist} onChange={(e) => setNewSongArtist(e.target.value)} placeholder="Artist (Optional)" className="w-full px-4 py-3 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"/></div><button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 flex items-center justify-center"><MusicIcon /> Add Song to List</button></div>)}
+                  {videoId && (<div className="space-y-4 pt-4 border-t"><div className="aspect-video"><iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${videoId}`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="rounded-lg"></iframe></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="relative">
+                        <input type="text" value={newSongTitle} onChange={(e) => setNewSongTitle(e.target.value)} placeholder="Song Title" required className="w-full px-4 py-3 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10"/>
+                        <button type="button" onClick={handleFetchTitle} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-indigo-600" title="Fetch video title">
+                            <FetchTitleIcon />
+                        </button>
+                    </div>
+                    <input type="text" value={newSongArtist} onChange={(e) => setNewSongArtist(e.target.value)} placeholder="Artist (Optional)" className="w-full px-4 py-3 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+                  </div><button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 flex items-center justify-center">Add Song to List</button></div>)}
                 </form>
               </div>
               <div className="mt-8">
@@ -424,6 +432,24 @@
             const confidenceValue = 100 * (1 - (Math.max(0, avgRD - minRD)) / (maxRD - minRD));
             return Math.max(0, Math.min(100, Math.round(confidenceValue)));
           }, [songs]);
+
+          const handleFetchTitle = async () => {
+              if (!newSongUrl) return;
+              try {
+                  const response = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(newSongUrl)}`);
+                  if (!response.ok) {
+                      throw new Error('Failed to fetch title');
+                  }
+                  const data = await response.json();
+                  if (data.title) {
+                      setNewSongTitle(data.title);
+                  } else {
+                      console.error("Could not find title in the response:", data);
+                  }
+              } catch (error) {
+                  console.error("Error fetching video title:", error);
+              }
+          };
 
           const handleAddSong = (e) => {
             e.preventDefault();
@@ -673,7 +699,7 @@
               {showResetConfirm && <ConfirmModal title="Start Over?" message="Are you sure you want to start over? All current songs and progress will be lost." onConfirm={confirmReset} onCancel={() => setShowResetConfirm(false)} confirmText="Yes, Start Over" cancelText="Cancel" confirmStyle="primary" />}
               {gameState === 'adding' && (
                 <AddSongsView 
-                  {...{ songs, newSongUrl, setNewSongUrl, newSongTitle, setNewSongTitle, newSongArtist, setNewSongArtist, handleAddSong, videoId, removeSong, startSorting, exportShareableList, importList, importProgress }}
+                  {...{ songs, newSongUrl, setNewSongUrl, newSongTitle, setNewSongTitle, newSongArtist, setNewSongArtist, handleAddSong, videoId, removeSong, startSorting, exportShareableList, importList, importProgress, handleFetchTitle }}
                   onEditSong={setEditingSong}
                 />
               )}
