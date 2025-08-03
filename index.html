@@ -183,6 +183,7 @@
         const ConfirmModal = ({ title, message, onConfirm, onCancel, confirmText, cancelText, confirmStyle = 'danger' }) => {
             const confirmButtonStyles = {
                 danger: 'bg-red-500 hover:bg-red-600 text-white',
+                primary: 'bg-indigo-600 text-white hover:bg-indigo-700',
                 secondary: 'bg-blue-100 text-blue-800 hover:bg-blue-200'
             };
 
@@ -530,7 +531,7 @@
           const handleSaveEdit = (updatedSong) => {
             const originalSong = songs.find(s => s.id === updatedSong.id);
             if (originalSong.youtubeUrl !== updatedSong.youtubeUrl) {
-                setUrlChangeConfirm(updatedSong);
+                setUrlChangeConfirm({updatedSong, originalSong});
                 setEditingSong(null);
             } else {
                 const newSongs = songs.map(song => song.id === updatedSong.id ? updatedSong : song);
@@ -540,12 +541,14 @@
           };
 
           const handleUrlChangeConfirm = (keepProgress) => {
-            const updatedSong = urlChangeConfirm;
+            const { updatedSong, originalSong } = urlChangeConfirm;
             const newSongs = songs.map(song => {
                 if (song.id === updatedSong.id) {
                     if (keepProgress) {
-                        return updatedSong;
+                        // Keep progress, just update details
+                        return { ...originalSong, ...updatedSong };
                     } else {
+                        // Reset progress
                         return { 
                             ...updatedSong, 
                             rating: 1500, 
@@ -666,28 +669,8 @@
           return (
             <div className="bg-gray-50 min-h-screen w-full flex items-center justify-center p-4 font-sans">
               {editingSong && <EditSongModal song={editingSong} onSave={handleSaveEdit} onCancel={() => setEditingSong(null)} />}
-              {urlChangeConfirm && <ConfirmModal title="Keep Progress?" message="You've changed the URL. Would you like to keep the progress for this song?" onConfirm={(keep) => {
-                  const updatedSong = urlChangeConfirm;
-                  const newSongs = songs.map(song => {
-                      if (song.id === updatedSong.id) {
-                          if (keep) {
-                              return updatedSong;
-                          } else {
-                              return { 
-                                  ...updatedSong, 
-                                  rating: 1500, 
-                                  rd: 350, 
-                                  volatility: 0.06, 
-                                  comparisons: 0 
-                              };
-                          }
-                      }
-                      return song;
-                  });
-                  setSongs(newSongs);
-                  setUrlChangeConfirm(null);
-              }} onCancel={() => setUrlChangeConfirm(null)} confirmText="Yes, Keep" cancelText="No, Reset" />}
-              {showResetConfirm && <ConfirmModal title="Start Over?" message="Are you sure you want to start over? All current songs and progress will be lost." onConfirm={confirmReset} onCancel={() => setShowResetConfirm(false)} confirmText="Yes, Start Over" cancelText="Cancel" confirmStyle="secondary" />}
+              {urlChangeConfirm && <ConfirmModal title="Keep Progress?" message="You've changed the URL. Would you like to keep the progress for this song?" onConfirm={() => handleUrlChangeConfirm(true)} onCancel={() => setUrlChangeConfirm(null)} confirmText="Yes, Keep Progress" cancelText="Cancel" confirmStyle="primary" />}
+              {showResetConfirm && <ConfirmModal title="Start Over?" message="Are you sure you want to start over? All current songs and progress will be lost." onConfirm={confirmReset} onCancel={() => setShowResetConfirm(false)} confirmText="Yes, Start Over" cancelText="Cancel" confirmStyle="primary" />}
               {gameState === 'adding' && (
                 <AddSongsView 
                   {...{ songs, newSongUrl, setNewSongUrl, newSongTitle, setNewSongTitle, newSongArtist, setNewSongArtist, handleAddSong, videoId, removeSong, startSorting, exportShareableList, importList, importProgress }}
