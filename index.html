@@ -33,7 +33,12 @@
         const TrophyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto h-12 w-12 text-yellow-400"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>;
         const UpArrowIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
         const DownArrowIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
-        const FetchTitleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+        const FetchTitleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+        const MouseIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="7"/><path d="M12 6v4"/></svg>;
+        const ArrowLeftSquareIcon = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3.5" y="3.5" width="17" height="17" rx="2" stroke="currentColor" strokeWidth="1"/><path d="M14 8L9 12L14 16V8Z" fill="currentColor"/></svg>;
+        const ArrowRightSquareIcon = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3.5" y="3.5" width="17" height="17" rx="2" stroke="currentColor" strokeWidth="1"/><path d="M10 16L15 12L10 8V16Z" fill="currentColor"/></svg>;
+        const ArrowUpSquareIcon = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3.5" y="3.5" width="17" height="17" rx="2" stroke="currentColor" strokeWidth="1"/><path d="M8 14L12 9L16 14H8Z" fill="currentColor"/></svg>;
+        const ArrowDownSquareIcon = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3.5" y="3.5" width="17" height="17" rx="2" stroke="currentColor" strokeWidth="1"/><path d="M16 10L12 15L8 10H16Z" fill="currentColor"/></svg>;
 
 
         // --- Glicko-2 Rating System Implementation ---
@@ -239,7 +244,10 @@
             const tieButtonRef = useRef(null);
             const hoverRegions = useRef(null);
             const [activePlayerId, setActivePlayerId] = useState(null);
+            const [keyboardSelectedId, setKeyboardSelectedId] = useState(null);
             const pauseTimeoutRef = useRef(null);
+            const [tutorialHovered, setTutorialHovered] = useState(false);
+            const isTutorialVisible = round < 3 || tutorialHovered;
 
             const calculateAreas = useCallback(() => {
                 if (cardARef.current && cardBRef.current && tieButtonRef.current) {
@@ -266,13 +274,35 @@
             
             useEffect(() => {
                 const handleKeyDown = (e) => {
-                    if (e.key === 'ArrowLeft') handleComparisonResult(songA, songB);
-                    if (e.key === 'ArrowRight') handleComparisonResult(songB, songA);
-                    if (e.key === 'ArrowDown') handleComparisonResult(songA, songB, true);
+                    if (!songA || !songB) return;
+
+                    if (e.key === 'ArrowLeft') {
+                        if (keyboardSelectedId === songA.id) {
+                            handleComparisonResult(songA, songB);
+                            setKeyboardSelectedId(null);
+                        } else {
+                            setActivePlayerId(songA.id);
+                            setKeyboardSelectedId(songA.id);
+                        }
+                    } else if (e.key === 'ArrowRight') {
+                        if (keyboardSelectedId === songB.id) {
+                            handleComparisonResult(songB, songA);
+                            setKeyboardSelectedId(null);
+                        } else {
+                            setActivePlayerId(songB.id);
+                            setKeyboardSelectedId(songB.id);
+                        }
+                    } else if (e.key === 'ArrowDown') {
+                        handleComparisonResult(songA, songB, true);
+                        setKeyboardSelectedId(null);
+                    } else if (e.key === 'ArrowUp') {
+                        setActivePlayerId(null);
+                        setKeyboardSelectedId(null);
+                    }
                 };
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [songA, songB, handleComparisonResult]);
+            }, [songA, songB, handleComparisonResult, keyboardSelectedId]);
 
             useEffect(() => {
                 const timer = setTimeout(calculateAreas, 100);
@@ -280,6 +310,8 @@
 
                 const handleMouseMove = (e) => {
                     if (!hoverRegions.current) return;
+                    if (keyboardSelectedId) return; // Ignore mouse if keyboard is active
+
                     const { clientX: x, clientY: y } = e;
                     const { left, right } = hoverRegions.current;
                     let newActivePlayerId = null;
@@ -298,7 +330,7 @@
                     window.removeEventListener('resize', calculateAreas);
                     window.removeEventListener('mousemove', handleMouseMove);
                 }
-            }, [comparisonPair, calculateAreas, songA, songB]);
+            }, [comparisonPair, calculateAreas, songA, songB, keyboardSelectedId]);
 
             useEffect(() => {
                 clearTimeout(pauseTimeoutRef.current);
@@ -318,40 +350,56 @@
             if (!songA || !songB) return <div className="text-center"><h2 className="text-2xl font-bold">Loading...</h2></div>;
             
             return (
-              <div className="w-full max-w-5xl mx-auto p-4 flex flex-col h-full justify-center">
-                  <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold">Which song is better?</h1>
-                    <p className="text-lg text-gray-500 mt-2">Round {round + 1}</p>
+              <>
+                  <div className="w-full max-w-5xl mx-auto p-4 flex flex-col h-full justify-center">
+                      <div className="text-center mb-8">
+                        <h1 className="text-3xl font-bold">Which song is better?</h1>
+                        <p className="text-lg text-gray-500 mt-2">Round {round + 1}</p>
+                      </div>
+                      <div className="flex flex-col md:flex-row items-stretch justify-around space-y-6 md:space-y-0 md:space-x-6">
+                        <SongCard 
+                          ref={cardARef} 
+                          song={songA} 
+                          onWin={() => handleComparisonResult(songA, songB)} 
+                          onPlayerReady={calculateAreas}
+                          {...{playersRef, isYtApiReady, handlePlayerStateChange}} 
+                        />
+                        <div className="text-2xl font-bold text-gray-700 flex flex-col items-center justify-center px-4">
+                          <button ref={tieButtonRef} onClick={() => handleComparisonResult(songA, songB, true)} className="text-base bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Tie</button>
+                        </div>
+                        <SongCard 
+                          ref={cardBRef} 
+                          song={songB} 
+                          onWin={() => handleComparisonResult(songB, songA)} 
+                          onPlayerReady={calculateAreas}
+                          {...{playersRef, isYtApiReady, handlePlayerStateChange}}
+                        />
+                      </div>
+                      <div className="mt-12 w-full max-w-md mx-auto text-center">
+                        <div className="flex justify-between mb-1"><span className="text-base font-medium">List Confidence</span><span className="text-sm font-medium">{confidence}%</span></div>
+                        <div className="w-full bg-gray-200 rounded-full h-2.5"><div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${confidence}%` }}></div></div>
+                        <div className="mt-4 flex justify-center gap-4">
+                          <button onClick={handleUndo} disabled={history.length === 0} className="text-sm bg-red-100 text-red-700 font-semibold py-2 px-4 rounded-lg hover:bg-red-200 disabled:opacity-50">Undo</button>
+                          <button onClick={exportProgress} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">Export Progress</button>
+                          <button onClick={() => setGameState('rankings')} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">View Rankings</button>
+                        </div>
+                      </div>
                   </div>
-                  <div className="flex flex-col md:flex-row items-stretch justify-around space-y-6 md:space-y-0 md:space-x-6">
-                    <SongCard 
-                      ref={cardARef} 
-                      song={songA} 
-                      onWin={() => handleComparisonResult(songA, songB)} 
-                      onPlayerReady={calculateAreas}
-                      {...{playersRef, isYtApiReady, handlePlayerStateChange}} 
-                    />
-                    <div className="text-2xl font-bold text-gray-700 flex flex-col items-center justify-center px-4">
-                      <button ref={tieButtonRef} onClick={() => handleComparisonResult(songA, songB, true)} className="text-base bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Tie</button>
-                    </div>
-                    <SongCard 
-                      ref={cardBRef} 
-                      song={songB} 
-                      onWin={() => handleComparisonResult(songB, songA)} 
-                      onPlayerReady={calculateAreas}
-                      {...{playersRef, isYtApiReady, handlePlayerStateChange}}
-                    />
+                  <div 
+                    className={`fixed bottom-4 left-1/2 -translate-x-1/2 text-gray-400 text-sm flex items-center justify-center gap-4 flex-wrap z-20 transition-opacity duration-300 ${isTutorialVisible ? 'opacity-100' : 'opacity-0'}`}
+                    onMouseEnter={() => setTutorialHovered(true)}
+                    onMouseLeave={() => setTutorialHovered(false)}
+                  >
+                      <MouseIcon />
+                      <span className="font-semibold">or</span>
+                      <div className="flex items-center gap-4 flex-wrap justify-center">
+                          <div className="flex items-center gap-1.5"><ArrowLeftSquareIcon /><span>Vote Left</span></div>
+                          <div className="flex items-center gap-1.5"><ArrowRightSquareIcon /><span>Vote Right</span></div>
+                          <div className="flex items-center gap-1.5"><ArrowDownSquareIcon /><span>Tie</span></div>
+                          <div className="flex items-center gap-1.5"><ArrowUpSquareIcon /><span>Pause</span></div>
+                      </div>
                   </div>
-                  <div className="mt-12 w-full max-w-md mx-auto text-center">
-                    <div className="flex justify-between mb-1"><span className="text-base font-medium">List Confidence</span><span className="text-sm font-medium">{confidence}%</span></div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5"><div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${confidence}%` }}></div></div>
-                    <div className="mt-4 flex justify-center gap-4">
-                      <button onClick={handleUndo} disabled={history.length === 0} className="text-sm bg-red-100 text-red-700 font-semibold py-2 px-4 rounded-lg hover:bg-red-200 disabled:opacity-50">Undo</button>
-                      <button onClick={exportProgress} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">Export Progress</button>
-                      <button onClick={() => setGameState('rankings')} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">View Rankings</button>
-                    </div>
-                  </div>
-              </div>
+              </>
             );
         };
 
@@ -717,7 +765,7 @@
                   href="https://github.com/KiyPhi/Song-Sorter" 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="fixed bottom-4 right-4 text-sm text-gray-500 hover:text-indigo-600 hover:underline z-50"
+                  className="fixed bottom-4 right-4 text-sm text-gray-500 hover:text-black hover:underline z-50"
               >
                   FAQ and GitHub
               </a>
