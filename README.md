@@ -28,7 +28,7 @@ A: This app uses a Glicko-2 rating system, which is an evolution of the Elo syst
 
 **Q: What does the "Confidence" percentage mean? When should I stop sorting?**
 
-A: Confidence is a rating of how stable ("non-volatile") the rankings are. You can technically stop sorting at any time and view the current rankings. I recommend going until at least 60% confidence for shorter lists (around 50 song). The returns on accuracy after 75% are pretty low, but you can go as high as you want for a more finely-tuned list. For much longer lists, you may need to go as high as 85-90%.
+A: Confidence is a rating of how stable the rankings are. You can technically stop sorting at any time and view the current rankings. I recommend going until at least 60% confidence for shorter lists (around 50 song). The returns on accuracy after 75% are pretty low, but you can go as high as you want for a more finely-tuned list. For much longer lists, you may need to go as high as 85-90%.
 
 **Q: What happens if I make a mistake? Can I undo a choice?**
 
