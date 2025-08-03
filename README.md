@@ -1,6 +1,6 @@
-# Song Sorter
+# [Song Sorter](https://kiyphi.github.io/Song-Sorter/)
 
-A simple, browser-based tool for creating ranked lists of songs using a Glicko-2 rating system. This app is for nerds who like ranked lists, made by a fellow nerd who thought others might like it as well.
+A simple, browser-based tool for creating ranked lists of songs using a Glicko-2 rating system. This app is for nerds who like ranked lists, made by a fellow ranked list nerd.
 
 ---
 
