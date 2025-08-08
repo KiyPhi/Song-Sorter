@@ -675,29 +675,45 @@
             URL.revokeObjectURL(url); 
             setIsDirty(false);
           };
-          const importProgress = (event) => { 
-            const file = event.target.files[0]; 
-            if (!file) return; 
-            const reader = new FileReader(); 
-            reader.onload = (e) => { 
-                try { 
-                    const { songs: importedSongs, history: importedHistory, round: importedRound } = JSON.parse(e.target.result); 
-                    if (importedSongs) { 
-                        setSongs(importedSongs); 
-                        setHistory(importedHistory || []); 
-                        setRound(importedRound || 0);
-                        setGameState('rankings'); 
-                        setIsDirty(false);
-                    } else { 
-                        alert("Invalid progress file."); 
-                    } 
-                } catch (error) { 
-                    alert("Could not import progress file."); 
-                } 
-            }; 
-            reader.readAsText(file); 
-            event.target.value = null; 
+
+          const importProgress = (event) => {
+              const file = event.target.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                  try {
+                      const data = JSON.parse(e.target.result);
+                      const importedSongs = data.songs;
+                      const importedHistory = data.history;
+                      let calculatedRound = 0;
+
+                      if (importedSongs && Array.isArray(importedSongs)) {
+                          setSongs(importedSongs);
+                          setHistory(importedHistory || []);
+
+                          // Fallback calculation for the round number
+                          if (typeof data.round !== 'number') {
+                              const totalComparisons = importedSongs.reduce((acc, song) => acc + (song.comparisons || 0), 0);
+                              calculatedRound = Math.ceil(totalComparisons / 2);
+                          } else {
+                              calculatedRound = data.round;
+                          }
+                          
+                          setRound(calculatedRound);
+                          setGameState('rankings');
+                          setIsDirty(false);
+                      } else {
+                          alert("Invalid progress file: 'songs' array not found.");
+                      }
+                  } catch (error) {
+                      console.error("Could not import progress file:", error);
+                      alert("Could not import progress file. See console for details.");
+                  }
+              };
+              reader.readAsText(file);
+              event.target.value = null;
           };
+
           const importList = (event) => { 
               const file = event.target.files[0]; 
               if (!file) return; 
