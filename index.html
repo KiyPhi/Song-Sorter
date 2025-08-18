@@ -39,7 +39,14 @@
         const ArrowRightSquareIcon = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3.5" y="3.5" width="17" height="17" rx="2" stroke="currentColor" strokeWidth="1"/><path d="M10 16L15 12L10 8V16Z" fill="currentColor"/></svg>;
         const ArrowUpSquareIcon = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3.5" y="3.5" width="17" height="17" rx="2" stroke="currentColor" strokeWidth="1"/><path d="M8 14L12 9L16 14H8Z" fill="currentColor"/></svg>;
         const ArrowDownSquareIcon = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3.5" y="3.5" width="17" height="17" rx="2" stroke="currentColor" strokeWidth="1"/><path d="M16 10L12 15L8 10H16Z" fill="currentColor"/></svg>;
-
+        const KeyIcon = ({ char }) => (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3.5" y="3.5" width="17" height="17" rx="2" stroke="currentColor" strokeWidth="1"/>
+                <text x="50%" y="50%" textAnchor="middle" dy=".3em" fill="currentColor" fontSize="12" fontFamily="sans-serif" fontWeight="600">
+                    {char}
+                </text>
+            </svg>
+        );
 
         // --- Glicko-2 Rating System Implementation ---
         const Glicko2 = {
@@ -231,12 +238,51 @@
             );
         };
 
+        const HotkeysCard = ({ hotkeys }) => (
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg p-3 z-30 text-gray-400">
+                <div className="flex items-center justify-center gap-4 flex-wrap">
+                    {hotkeys.map((hotkey, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
+                                {hotkey.keys.map(key => <KeyIcon key={key} char={key} />)}
+                            </div>
+                            <span className="text-sm text-gray-400">{hotkey.description}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
         const AddSongsView = ({ songs, newSongUrl, setNewSongUrl, newSongTitle, setNewSongTitle, newSongArtist, setNewSongArtist, handleAddSong, videoId, removeSong, startSorting, exportShareableList, importList, importProgress, onEditSong, handleFetchTitle }) => {
           const listFileInputRef = useRef(null);
           const progressFileInputRef = useRef(null);
+          const [showHotkeys, setShowHotkeys] = useState(false);
+
+          const addSongsHotkeys = [
+              { keys: ['I'], description: 'Import Progress' },
+              { keys: ['L'], description: 'Import List' },
+          ];
+
+          useEffect(() => {
+              const handleKeyDown = (e) => {
+                  const key = e.key.toLowerCase();
+                  if (document.activeElement.tagName === 'INPUT') return; 
+
+                  if (key === 'i') {
+                      progressFileInputRef.current.click();
+                  } else if (key === 'l') {
+                      listFileInputRef.current.click();
+                  } else if (key === 'h') {
+                      setShowHotkeys(prev => !prev);
+                  }
+              };
+              window.addEventListener('keydown', handleKeyDown);
+              return () => window.removeEventListener('keydown', handleKeyDown);
+          }, []);
 
           return (
             <div className="w-full max-w-2xl mx-auto p-4">
+              {showHotkeys && <HotkeysCard hotkeys={addSongsHotkeys} />}
               {songs.length > 4 && <ScrollButtons />}
               <div className="bg-white rounded-xl shadow-lg p-6 md:p-8">
                 <div className="text-center mb-6"><h1 className="text-3xl font-bold">Song Sorter</h1><p className="text-gray-500 mt-2">Add songs. This app uses a Glicko-2 rating system to rank them.</p></div>
@@ -272,7 +318,55 @@
             const [keyboardSelectedId, setKeyboardSelectedId] = useState(null);
             const pauseTimeoutRef = useRef(null);
             const [tutorialHovered, setTutorialHovered] = useState(false);
+            const [showHotkeys, setShowHotkeys] = useState(false);
             const isTutorialVisible = round < 3 || tutorialHovered;
+
+            const sortingHotkeys = [
+                { keys: ['Z'], description: 'Undo' },
+                { keys: ['X'], description: 'Export Progress' },
+                { keys: ['V'], description: 'View Rankings' },
+            ];
+
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (!songA || !songB) return;
+                    const key = e.key.toLowerCase();
+
+                    if (key === 'arrowleft') {
+                        if (keyboardSelectedId === songA.id) {
+                            handleComparisonResult(songA, songB);
+                            setKeyboardSelectedId(null);
+                        } else {
+                            setActivePlayerId(songA.id);
+                            setKeyboardSelectedId(songA.id);
+                        }
+                    } else if (key === 'arrowright') {
+                        if (keyboardSelectedId === songB.id) {
+                            handleComparisonResult(songB, songA);
+                            setKeyboardSelectedId(null);
+                        } else {
+                            setActivePlayerId(songB.id);
+                            setKeyboardSelectedId(songB.id);
+                        }
+                    } else if (key === 'arrowdown') {
+                        handleComparisonResult(songA, songB, true);
+                        setKeyboardSelectedId(null);
+                    } else if (key === 'arrowup') {
+                        setActivePlayerId(null);
+                        setKeyboardSelectedId(null);
+                    } else if (key === 'z') {
+                        handleUndo();
+                    } else if (key === 'x') {
+                        exportProgress();
+                    } else if (key === 'v') {
+                        setGameState('rankings');
+                    } else if (key === 'h') {
+                        setShowHotkeys(prev => !prev);
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [songA, songB, handleComparisonResult, keyboardSelectedId, handleUndo, exportProgress, setGameState]);
 
             const calculateAreas = useCallback(() => {
                 if (cardARef.current && cardBRef.current && tieButtonRef.current) {
@@ -297,38 +391,6 @@
                 }
             }, []);
             
-            useEffect(() => {
-                const handleKeyDown = (e) => {
-                    if (!songA || !songB) return;
-
-                    if (e.key === 'ArrowLeft') {
-                        if (keyboardSelectedId === songA.id) {
-                            handleComparisonResult(songA, songB);
-                            setKeyboardSelectedId(null);
-                        } else {
-                            setActivePlayerId(songA.id);
-                            setKeyboardSelectedId(songA.id);
-                        }
-                    } else if (e.key === 'ArrowRight') {
-                        if (keyboardSelectedId === songB.id) {
-                            handleComparisonResult(songB, songA);
-                            setKeyboardSelectedId(null);
-                        } else {
-                            setActivePlayerId(songB.id);
-                            setKeyboardSelectedId(songB.id);
-                        }
-                    } else if (e.key === 'ArrowDown') {
-                        handleComparisonResult(songA, songB, true);
-                        setKeyboardSelectedId(null);
-                    } else if (e.key === 'ArrowUp') {
-                        setActivePlayerId(null);
-                        setKeyboardSelectedId(null);
-                    }
-                };
-                window.addEventListener('keydown', handleKeyDown);
-                return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [songA, songB, handleComparisonResult, keyboardSelectedId]);
-
             useEffect(() => {
                 const timer = setTimeout(calculateAreas, 100);
                 window.addEventListener('resize', calculateAreas);
@@ -376,6 +438,7 @@
             
             return (
               <>
+                  {showHotkeys && <HotkeysCard hotkeys={sortingHotkeys} />}
                   <div className="w-full max-w-5xl mx-auto p-4 flex flex-col h-full justify-center">
                       <div className="text-center mb-8">
                         <h1 className="text-3xl font-bold">Which song is better?</h1>
@@ -411,7 +474,7 @@
                       </div>
                   </div>
                   <div 
-                    className={`fixed bottom-4 left-1/2 -translate-x-1/2 text-gray-400 text-sm flex items-center justify-center gap-4 flex-wrap z-20 transition-opacity duration-300 ${isTutorialVisible ? 'opacity-100' : 'opacity-0'}`}
+                    className={`fixed bottom-4 left-1/2 -translate-x-1/2 text-gray-400 text-sm flex items-center justify-center gap-4 flex-wrap z-20 transition-opacity duration-300 ${isTutorialVisible && !showHotkeys ? 'opacity-100' : 'opacity-0'}`}
                     onMouseEnter={() => setTutorialHovered(true)}
                     onMouseLeave={() => setTutorialHovered(false)}
                   >
@@ -422,39 +485,79 @@
                           <div className="flex items-center gap-1.5"><ArrowRightSquareIcon /><span>Vote Right</span></div>
                           <div className="flex items-center gap-1.5"><ArrowDownSquareIcon /><span>Tie</span></div>
                           <div className="flex items-center gap-1.5"><ArrowUpSquareIcon /><span>Pause</span></div>
+                          <div className="flex items-center gap-1.5"><KeyIcon char="H" /><span>Hotkeys</span></div>
                       </div>
                   </div>
               </>
             );
         };
 
-        const RankingsView = ({ rankedSongs, setGameState, selectNextPair, songs, exportNumberedList, handleReset, exportShareableList }) => (
-            <div className="w-full max-w-2xl mx-auto p-4">
-              {rankedSongs.length > 4 && <ScrollButtons />}
-              <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 text-center"><TrophyIcon /><h1 className="text-4xl font-bold mt-4">Current Rankings</h1><p className="text-gray-500 mt-2">The more you sort, the more accurate this list becomes.</p></div>
-              <div className="mt-8 bg-white rounded-xl shadow-lg p-4">
-                <ol className="space-y-3">{rankedSongs.map((song, index) => {
-                  const isTopRanked = (rankedSongs.length >= 30 && index < 10) || index < 3;
-                  return (
-                    <li key={song.id} className="flex items-center bg-gray-50 p-4 rounded-lg">
-                      <span className={`text-xl font-bold ${isTopRanked ? 'text-indigo-600' : 'text-gray-400'} w-10`}>{index + 1}</span>
-                      <div className="flex-grow"><p className="font-semibold">{song.title}</p>{song.artist && <p className="text-sm text-gray-500">{song.artist}</p>}</div>
-                      <div className="text-right"><p className="font-semibold">{Math.round(song.rating)}</p><p className="text-xs text-gray-500">±{Math.round(song.rd * 2)}</p></div>
-                    </li>
-                  );
-                })}</ol>
-              </div>
-              <div className="mt-8 grid grid-cols-2 gap-4">
-                <button onClick={() => { setGameState('sorting'); selectNextPair(songs); }} className="bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700">Continue Sorting</button>
-                <button onClick={exportShareableList} className="bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700">Export Song List (.txt)</button>
-                <button onClick={() => setGameState('adding')} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">Add/Remove Songs</button>
-                <button onClick={handleReset} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">Start Over</button>
-              </div>
-              <div className="mt-4 text-center">
-                <button onClick={exportNumberedList} className="text-indigo-600 hover:underline text-sm font-semibold">Export Ranked List (.txt)</button>
-              </div>
-            </div>
-        );
+        const RankingsView = ({ rankedSongs, setGameState, selectNextPair, songs, exportNumberedList, handleReset, exportShareableList }) => {
+            const [showHotkeys, setShowHotkeys] = useState(false);
+            const rankingHotkeys = [
+                { keys: ['C'], description: 'Continue Sorting' },
+                { keys: ['E'], description: 'Export Song List' },
+                { keys: ['A'], description: 'Add/Remove' },
+                { keys: ['S'], description: 'Start Over' },
+                { keys: ['R'], description: 'Export Ranked List' },
+            ];
+
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    const key = e.key.toLowerCase();
+                    if (key === 'c') {
+                        setGameState('sorting');
+                        selectNextPair(songs);
+                    }
+                    else if (key === 'e') {
+                        exportShareableList();
+                    }
+                    else if (key === 'a') {
+                        setGameState('adding');
+                    }
+                    else if (key === 's') {
+                        handleReset();
+                    }
+                    else if (key === 'r') {
+                        exportNumberedList();
+                    }
+                    else if (key === 'h') {
+                        setShowHotkeys(prev => !prev);
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [setGameState, selectNextPair, songs, exportShareableList, handleReset, exportNumberedList]);
+
+            return (
+                <div className="w-full max-w-2xl mx-auto p-4">
+                  {showHotkeys && <HotkeysCard hotkeys={rankingHotkeys} />}
+                  {rankedSongs.length > 4 && <ScrollButtons />}
+                  <div className="bg-white rounded-xl shadow-lg p-6 md:p-8 text-center"><TrophyIcon /><h1 className="text-4xl font-bold mt-4">Current Rankings</h1><p className="text-gray-500 mt-2">The more you sort, the more accurate this list becomes.</p></div>
+                  <div className="mt-8 bg-white rounded-xl shadow-lg p-4">
+                    <ol className="space-y-3">{rankedSongs.map((song, index) => {
+                      const isTopRanked = (rankedSongs.length >= 30 && index < 10) || index < 3;
+                      return (
+                        <li key={song.id} className="flex items-center bg-gray-50 p-4 rounded-lg">
+                          <span className={`text-xl font-bold ${isTopRanked ? 'text-indigo-600' : 'text-gray-400'} w-10`}>{index + 1}</span>
+                          <div className="flex-grow"><p className="font-semibold">{song.title}</p>{song.artist && <p className="text-sm text-gray-500">{song.artist}</p>}</div>
+                          <div className="text-right"><p className="font-semibold">{Math.round(song.rating)}</p><p className="text-xs text-gray-500">±{Math.round(song.rd * 2)}</p></div>
+                        </li>
+                      );
+                    })}</ol>
+                  </div>
+                  <div className="mt-8 grid grid-cols-2 gap-4">
+                    <button onClick={() => { setGameState('sorting'); selectNextPair(songs); }} className="bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700">Continue Sorting</button>
+                    <button onClick={exportShareableList} className="bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700">Export Song List (.txt)</button>
+                    <button onClick={() => setGameState('adding')} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">Add/Remove Songs</button>
+                    <button onClick={handleReset} className="text-sm bg-blue-100 text-blue-800 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200">Start Over</button>
+                  </div>
+                  <div className="mt-4 text-center">
+                    <button onClick={exportNumberedList} className="text-indigo-600 hover:underline text-sm font-semibold">Export Ranked List (.txt)</button>
+                  </div>
+                </div>
+            )
+        };
 
 
         // --- MAIN APP COMPONENT ---
