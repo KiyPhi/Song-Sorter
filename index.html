@@ -518,12 +518,10 @@
             const handleScreenshot = () => {
                 const element = rankingsListRef.current;
                 if (element) {
-                    // Temporarily remove classes that cause rendering issues
                     const originalClasses = element.className;
                     element.classList.remove('shadow-lg');
                     
                     html2canvas(element).then(canvas => {
-                        // Add the classes back immediately after capture
                         element.className = originalClasses;
 
                         const link = document.createElement('a');
@@ -668,10 +666,14 @@
             if (newSongTitle.trim() && videoId) {
               setSongs([...songs, { id: crypto.randomUUID(), title: newSongTitle.trim(), artist: newSongArtist.trim(), youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`, rating: 1500, rd: 350, volatility: 0.06, comparisons: 0 }]);
               setNewSongUrl(''); setNewSongTitle(''); setNewSongArtist('');
+              setHistory([]);
             }
           };
           
-          const removeSong = (id) => setSongs(songs.filter(song => song.id !== id));
+          const removeSong = (id) => {
+            setSongs(songs.filter(song => song.id !== id));
+            setHistory([]);
+          };
           
           const selectNextPair = (currentSongs) => {
             if (currentSongs.length < 2) { 
@@ -719,18 +721,30 @@
 
           const startSorting = () => {
             if (songs.length < 2) return;
+            
+            const totalComparisons = songs.reduce((acc, song) => acc + (song.comparisons || 0), 0);
+            
             const initSongs = songs.map(s => ({ ...s, rating: s.rating || 1500, rd: s.rd || 350, volatility: s.volatility || 0.06, comparisons: s.comparisons || 0 }));
             setSongs(initSongs); 
-            setHistory([]); 
-            setRound(0);
+
+            if (totalComparisons > 0) {
+                const calculatedRound = Math.ceil(totalComparisons / 2);
+                setRound(calculatedRound);
+            } else {
+                setRound(0);
+                setHistory([]); 
+            }
+            
             setIsDirty(false);
             setGameState('sorting'); 
             selectNextPair(initSongs);
           };
 
           const handleComparisonResult = (winner, loser, isTie = false) => {
-            const updatedHistory = [...history, songs].slice(-100);
+            const statsSnapshot = songs.map(({ id, rating, rd, volatility, comparisons }) => ({ id, rating, rd, volatility, comparisons }));
+            const updatedHistory = [...history, statsSnapshot].slice(-100);
             setHistory(updatedHistory); 
+            
             setRound(round + 1);
             setIsDirty(true);
             const score_winner = isTie ? 0.5 : 1.0; const score_loser = isTie ? 0.5 : 0.0;
@@ -748,12 +762,18 @@
           const handleUndo = () => {
             if (history.length === 0) return;
             const newHistory = [...history];
-            const lastState = newHistory.pop();
-            setSongs(lastState); 
+            const lastStatsSnapshot = newHistory.pop();
+            
+            const restoredSongs = songs.map(currentSong => {
+                const previousStats = lastStatsSnapshot.find(s => s.id === currentSong.id);
+                return previousStats ? { ...currentSong, ...previousStats } : currentSong;
+            });
+
+            setSongs(restoredSongs); 
             setHistory(newHistory); 
             setRound(round - 1);
             setIsDirty(true);
-            selectNextPair(lastState);
+            selectNextPair(restoredSongs);
           };
 
           const handlePlayerStateChange = useCallback((event, activePlayerId) => {
@@ -776,6 +796,9 @@
                 setSongs(newSongs);
                 setEditingSong(null);
             }
+            if(originalSong.youtubeUrl !== updatedSong.youtubeUrl && !keepProgress) {
+                setHistory([]);
+            }
           };
 
           const handleUrlChangeConfirm = (keepProgress) => {
@@ -783,10 +806,9 @@
             const newSongs = songs.map(song => {
                 if (song.id === updatedSong.id) {
                     if (keepProgress) {
-                        // Keep progress, just update details
                         return { ...originalSong, ...updatedSong };
                     } else {
-                        // Reset progress
+                        setHistory([]);
                         return { 
                             ...updatedSong, 
                             rating: 1500, 
