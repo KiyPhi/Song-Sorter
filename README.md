@@ -60,7 +60,7 @@ A: That is the "Rating Deviation" (RD). It's a measure of how certain the system
 
 **Q: Why do some YouTube videos not show a preview?**
 
-A: YouTube sometimes restricts certain videos from being embedded on third-party websites. If a video doesn't show up in the preview, it's due to the uploader's settings. You can use the "Edit" button to try and find an alternative link for that song.
+A: YouTube sometimes restricts certain videos from being embedded on third-party websites. If a video doesn't show up in the preview and you are using the github hosted page, it's due to the uploader's settings. You can use the "Edit" button to try and find an alternative link for that song. If you are using a local copy, YouTube will sometimes block local pages from displaying videos. Try using the github hosted version.
 
 **Q: What happens if I close the browser? Is my progress saved automatically?**
 
